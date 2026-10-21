@@ -38,6 +38,7 @@ static int RunScript(App& app, SDL_Surface* surface, const char* scriptPath, con
         app.Frame(in, 1.0f / 60);
         SDL_Delay(4);
     };
+    setvbuf(stdout, nullptr, _IOLBF, 0);  // keep progress visible if something aborts
     int failures = 0;
     std::string line;
     while (std::getline(f, line)) {

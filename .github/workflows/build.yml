@@ -24,21 +24,26 @@ jobs:
             libcurl4-openssl-dev libwebp-dev zlib1g-dev fonts-dejavu-core >/dev/null
       - name: Build
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo             -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer"             -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer"             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
           cmake --build build -j$(nproc)
       - name: Unit tests
         run: ./build/test_urlutil
       - name: Screenshots
+        env:
+          ASAN_OPTIONS: detect_leaks=0
         run: |
           mkdir -p preview
           ./build/browsenx --script tests/shots.txt preview
-      - uses: actions/upload-artifact@v4
+      # The account's artifact storage is full, so screenshots go to a "preview" pre-release instead.
+      - name: Publish screenshots
         if: always()
-        with:
-          name: preview
-          path: |
-            preview/*
-            data/log.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp data/log.txt preview/log.txt 2>/dev/null || true
+          ls preview
+          gh release view preview >/dev/null 2>&1 ||             gh release create preview --prerelease --title "CI screenshots" --notes "Desktop build screenshots from CI."
+          gh release upload preview preview/* --clobber
 
   switch:
     name: Switch nro
@@ -53,10 +58,6 @@ jobs:
           $DEVKITPRO/portlibs/switch/bin/aarch64-none-elf-pkg-config --exists sdl2 freetype2 libcurl libwebp
       - name: Build
         run: make -j$(nproc)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: BrowseNX
-          path: BrowseNX.nro
       - name: Publish
         if: github.ref == 'refs/heads/main'
         env:
