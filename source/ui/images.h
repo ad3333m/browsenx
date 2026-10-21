@@ -16,6 +16,7 @@ struct Img {
     int w = 0, h = 0;
     bool failed = false;
     bool animated = false;
+    int natW = 0, natH = 0;  // size before any downscale/upscale: what a web page lays out with
 };
 
 void Init(const std::string& cacheDir);
@@ -24,7 +25,7 @@ void Shutdown();
 // Calling it every frame the image is visible keeps it cached and prioritised.
 // Add "#still" to a URL to get only its first frame.
 const Img* Get(const std::string& url, int maxDim = 1024);
-void Put(const std::string& url, SDL_Texture* tex, int w, int h);  // for built-in/mock art
+void Put(const std::string& url, SDL_Texture* tex, int w, int h, int natW = 0, int natH = 0);  // for built-in/mock art
 // drew: whether this frame was drawn (animation timing follows drawn frames).
 void EndFrame(bool drew);
 bool Busy();          // downloads or uploads in flight

@@ -185,6 +185,8 @@ void Worker() {
         // The first frame now; the rest trickle in from EndFrame.
         e.img.w = img.w;
         e.img.h = img.h;
+        e.img.natW = img.natW ? img.natW : img.w;
+        e.img.natH = img.natH ? img.natH : img.h;
         SDL_Texture* first = MakeTexture(img.frames[0], img.w, img.h);
         if (!first) {
             e.state = State::Failed;
@@ -252,7 +254,8 @@ static bool DecodeSvg(const std::string& bytes, int maxDim, DecodedImage& out) {
         nsvgDelete(svg);
         return false;
     }
-    const float scale = std::min(1.0f, (float)maxDim / std::max(w, h));
+    // Small icons are rasterised larger so they stay sharp when a page draws them big.
+    const float scale = std::clamp(256.0f / std::max(w, h), 1.0f, 4.0f) * std::min(1.0f, maxDim / std::max(w, h));
     const int iw = std::max(1, (int)std::lround(w * scale)), ih = std::max(1, (int)std::lround(h * scale));
     std::string px((size_t)iw * ih * 4, '\0');
     NSVGrasterizer* r = nsvgCreateRasterizer();
@@ -262,6 +265,8 @@ static bool DecodeSvg(const std::string& bytes, int maxDim, DecodedImage& out) {
     out = DecodedImage{};
     out.w = iw;
     out.h = ih;
+    out.natW = std::max(1, (int)std::lround(w));
+    out.natH = std::max(1, (int)std::lround(h));
     out.frames.push_back(std::move(px));
     out.delaysMs.push_back(0);
     return true;
@@ -282,6 +287,8 @@ bool Decode(const std::string& bytes, int maxDim, int maxFrames, DecodedImage& o
     out = DecodedImage{};
     out.w = nw;
     out.h = nh;
+    out.natW = w;
+    out.natH = h;
     out.frames.push_back(Anim::Scale(px, w, h, nw, nh));
     out.delaysMs.push_back(0);
     stbi_image_free(px);
@@ -340,10 +347,10 @@ const Img* Get(const std::string& rawUrl, int maxDim) {
     return nullptr;
 }
 
-void Put(const std::string& url, SDL_Texture* tex, int w, int h) {
+void Put(const std::string& url, SDL_Texture* tex, int w, int h, int natW, int natH) {
     Entry& e = g_map[url];
     e.state = State::Ready;
-    e.img = Img{tex, w, h, false, false};
+    e.img = Img{tex, w, h, false, false, natW ? natW : w, natH ? natH : h};
     e.frames = {tex};
     e.delays = {100};
     e.pinned = true;

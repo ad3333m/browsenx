@@ -10,6 +10,7 @@ struct DecodedImage {
     int w = 0, h = 0;
     std::vector<std::string> frames;  // RGBA, w*h*4 each
     std::vector<int> delaysMs;
+    int natW = 0, natH = 0;  // original size when the frames were scaled (0 = same as w, h)
 };
 
 namespace Anim {

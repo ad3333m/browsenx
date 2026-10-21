@@ -60,7 +60,8 @@ void PutDataImage(const std::string& url) {
     }
     DecodedImage img;
     if (!Images::Decode(bytes, 1024, 1, img) || img.frames.empty()) return;
-    if (SDL_Texture* t = Images::MakeTexture(img.frames[0], img.w, img.h)) Images::Put(url, t, img.w, img.h);
+    if (SDL_Texture* t = Images::MakeTexture(img.frames[0], img.w, img.h))
+        Images::Put(url, t, img.w, img.h, img.natW, img.natH);
 }
 
 Color GradientAt(const background_layer::gradient_base& g, float t) {
@@ -118,6 +119,10 @@ public:
     }
 
     void draw(uint_ptr hdc, pixel_t x, pixel_t y, const position* clip, const std::shared_ptr<render_item>& ri) override {
+        // ponytail: litehtml has no `opacity`; sites hide the real checkbox behind a styled one with
+        // opacity:0 + position:absolute, so absolutely positioned toggles aren't drawn.
+        const std::string kind = Forms::Type(shared_from_this());
+        if ((kind == "checkbox" || kind == "radio") && css().get_position() == element_position_absolute) return;
         html_tag::draw(hdc, x, y, clip, ri);
         auto* box = static_cast<WebContainer*>(get_document()->container());
         position p = ri->pos();
@@ -519,7 +524,7 @@ void WebContainer::get_image_size(const char* src, const char* baseurl, size& sz
     if (Str::StartsWith(u, "data:")) PutDataImage(u);
     const Images::Img* img = Images::Get(u);
     if (img && img->tex) {
-        sz = size((pixel_t)img->w, (pixel_t)img->h);
+        sz = size((pixel_t)img->natW, (pixel_t)img->natH);
     } else if (!img && !Str::StartsWith(u, "data:")) {
         waitingImages.insert(u);
     }
