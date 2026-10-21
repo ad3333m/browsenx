@@ -49,8 +49,8 @@ void Shutdown();
 bool Running();
 Input PollInput();
 
-std::string DataDir();                          // ends with '/' — sdmc:/switch/GitHub/
-std::string DownloadDir();                      // sdmc:/switch/ (where NROs land)
+std::string DataDir();                          // ends with '/': sdmc:/switch/BrowseNX/
+std::string SdRoot();                           // "sdmc:/" on the Switch, a scratch folder on desktop
 std::string AssetPath(const std::string& rel);  // romfs:/<rel>
 std::vector<FontBlob> SystemFonts();
 

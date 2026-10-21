@@ -135,7 +135,7 @@ public:
             int i = Forms::SelectedIndex(self);
             std::string label = i >= 0 && i < (int)opts.size() ? opts[i].first : "";
             box->DrawControlText(label, css().get_font(), fg, p.x, midY, p.width - fm.height);
-            Icon::Chevron(p.Right() - fm.height * 0.45f, p.y + p.height / 2, fm.height * 0.6f, fg, 1);
+            Icon::Chevron(p.right() - fm.height * 0.45f, p.y + p.height / 2, fm.height * 0.6f, fg, 1);
         } else if (Forms::IsSubmit(self) || type == "button" || type == "reset" || type == "file") {
             std::string label = Label();
             float w = box->text_width(label.c_str(), css().get_font());
