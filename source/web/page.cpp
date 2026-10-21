@@ -1,6 +1,7 @@
 #include "web/page.h"
 
 #include <algorithm>
+#include <functional>
 #include <cctype>
 
 #include <litehtml/encodings.h>
@@ -296,5 +297,24 @@ std::string Page::Probe(float x, float y) {
         part += Str::Format(" [%.0f,%.0f %.0fx%.0f]", p.x, p.y, p.width, p.height);
         out += (out.empty() ? "" : " < ") + part;
     }
+    return out;
+}
+
+std::string Page::Outline(int depth) {
+    std::string out;
+    std::function<void(const litehtml::element::ptr&, int)> walk = [&](const litehtml::element::ptr& el, int d) {
+        std::string tag = Forms::Tag(el);
+        if (tag.empty() || d > depth) return;
+        litehtml::position p = el->get_placement();
+        std::string line(d * 2, ' ');
+        line += tag;
+        if (const char* id = el->get_attr("id")) line += std::string("#") + id;
+        if (const char* cls = el->get_attr("class")) line += "." + Str::Replace(Str::Utf8Truncate(cls, 60), " ", ".");
+        line += Str::Format(" [%.0f,%.0f %.0fx%.0f] disp=%d pos=%d", p.x, p.y, p.width, p.height,
+                            (int)el->css().get_display(), (int)el->css().get_position());
+        out += line + "|";
+        for (auto& c : el->children()) walk(c, d + 1);
+    };
+    if (doc_) walk(doc_->root(), 0);
     return out;
 }

@@ -55,7 +55,9 @@ public:
     bool Locate(const std::string& selector, float& x, float& y);
     bool Busy() const;
     // Debug (CI script): the element chain under a screen point, e.g. "div#content.mw-body [0,1520 960x4000]".
-    std::string Probe(float x, float y);              // loading, or still waiting on stylesheets/images
+    std::string Probe(float x, float y);
+    // Debug (CI script): elements down to `depth` levels with their laid-out boxes, one per line.
+    std::string Outline(int depth);              // loading, or still waiting on stylesheets/images
 
 private:
     WebContainer box_;  // before doc_: the document hands its fonts back to it when destroyed

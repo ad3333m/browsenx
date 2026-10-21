@@ -92,6 +92,11 @@ static int RunScript(App& app, SDL_Surface* surface, const char* scriptPath, con
             float x = 0, y = 0;
             sscanf(arg.c_str(), "%f %f", &x, &y);
             printf("probe %s: %s\n", arg.c_str(), app.page.Probe(x, y).c_str());
+        } else if (cmd == "outline") {
+            std::string o = app.page.Outline(atoi(arg.c_str()));
+            for (char& ch : o)
+                if (ch == '|') ch = 10;  // one element per line
+            fputs(o.c_str(), stdout);
         } else if (cmd == "expect") {
             std::ifstream e(arg, std::ios::binary | std::ios::ate);
             if (!e || e.tellg() <= 0) {
