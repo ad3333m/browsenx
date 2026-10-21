@@ -694,7 +694,6 @@ void App::DrawToasts() {
     for (auto it = toasts_.rbegin(); it != toasts_.rend(); ++it) {
         float w = std::min(1000.0f, Text::Width(it->text, Face::Medium, 16) + 40);
         Rect r{(Gfx::W - w) / 2, y - 44, w, 40};
-        Gfx::Shadow(r, 20, 16, Color(0, 0, 0, 120));
         Gfx::FillRound(r, 20, it->error ? Mix(th.danger, th.surface, 0.55f) : th.surface3);
         Text::DrawCentered(it->text, r.x + w / 2, r.y + 9, Face::Medium, 16, th.textStrong, w - 40);
         y -= 50;

@@ -27,6 +27,7 @@ input[type="submit"], input[type="button"], input[type="reset"], input[type="ima
 }
 input[type="checkbox"], input[type="radio"] { padding: 0; margin: 3px 4px; }
 input[type="radio"] { border-radius: 50%; }
+main, figure, figcaption, details, summary, dialog, search { display: block; }
 )css";
 
 namespace {
@@ -89,7 +90,7 @@ public:
         const std::string type = Forms::Type(shared_from_this());
         sz.height = fm.height;
         if (type == "checkbox" || type == "radio") {
-            sz.width = sz.height = std::round(fs * 0.9f);
+            sz.width = sz.height = std::round(fs * 1.1f);
         } else if (tag == "select") {
             pixel_t w = 0;
             for (auto& o : Forms::Options(shared_from_this()))

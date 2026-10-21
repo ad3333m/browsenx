@@ -88,6 +88,10 @@ static int RunScript(App& app, SDL_Surface* surface, const char* scriptPath, con
         } else if (cmd == "scroll") {
             app.page.ScrollBy((float)atof(arg.c_str()));
             frame(0);
+        } else if (cmd == "probe") {
+            float x = 0, y = 0;
+            sscanf(arg.c_str(), "%f %f", &x, &y);
+            printf("probe %s: %s\n", arg.c_str(), app.page.Probe(x, y).c_str());
         } else if (cmd == "expect") {
             std::ifstream e(arg, std::ios::binary | std::ios::ate);
             if (!e || e.tellg() <= 0) {

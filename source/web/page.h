@@ -53,11 +53,13 @@ public:
     void Relayout();                // after a form control changed size or content
     // Screen centre of the first element matching a CSS selector (used by the CI script).
     bool Locate(const std::string& selector, float& x, float& y);
-    bool Busy() const;              // loading, or still waiting on stylesheets/images
+    bool Busy() const;
+    // Debug (CI script): the element chain under a screen point, e.g. "div#content.mw-body [0,1520 960x4000]".
+    std::string Probe(float x, float y);              // loading, or still waiting on stylesheets/images
 
 private:
+    WebContainer box_;  // before doc_: the document hands its fonts back to it when destroyed
     std::shared_ptr<litehtml::document> doc_;
-    WebContainer box_;
     Rect view_{0, 56, 1280, 636};
     std::string html_, charset_, fragment_;
     int gen_ = 0;       // bumps on every navigation; late results from old ones are dropped

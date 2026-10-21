@@ -281,3 +281,20 @@ bool Page::Locate(const std::string& selector, float& x, float& y) {
 }
 
 bool Page::Busy() const { return loading || cssWaiting_ > 0 || !box_.waitingImages.empty(); }
+
+std::string Page::Probe(float x, float y) {
+    if (!doc_) return "";
+    Hover(x, y);
+    std::string out;
+    for (auto el = std::const_pointer_cast<litehtml::element>(doc_->get_over_element()); el; el = el->parent()) {
+        std::string tag = Forms::Tag(el);
+        if (tag.empty()) continue;
+        std::string part = tag;
+        if (const char* id = el->get_attr("id")) part += std::string("#") + id;
+        if (const char* cls = el->get_attr("class")) part += "." + Str::Replace(cls, " ", ".");
+        litehtml::position p = el->get_placement();
+        part += Str::Format(" [%.0f,%.0f %.0fx%.0f]", p.x, p.y, p.width, p.height);
+        out += (out.empty() ? "" : " < ") + part;
+    }
+    return out;
+}

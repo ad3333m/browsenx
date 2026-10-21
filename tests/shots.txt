@@ -25,6 +25,11 @@ shot 06-example
 open https://en.wikipedia.org/wiki/Nintendo_Switch
 wait
 shot 07-wikipedia
+probe 300 150
+probe 300 300
+probe 300 500
+probe 300 700
+probe 900 300
 scroll 1500
 shot 08-wikipedia-scrolled
 
