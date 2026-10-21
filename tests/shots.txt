@@ -25,7 +25,6 @@ shot 06-example
 open https://en.wikipedia.org/wiki/Nintendo_Switch
 wait
 shot 07-wikipedia
-outline 7
 scroll 1500
 shot 08-wikipedia-scrolled
 

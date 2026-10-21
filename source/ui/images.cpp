@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <climits>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <deque>
@@ -16,6 +17,8 @@
 #include "net/async.h"
 #include "net/http.h"
 #include "platform/platform.h"
+#include "nanosvg.h"
+#include "nanosvgrast.h"
 #include "stb_image.h"
 #include "ui/gfx.h"
 #include "util/log.h"
@@ -234,12 +237,43 @@ void Shutdown() {
 
 void SetAnimate(bool on) { g_animate = on; }
 
+static bool LooksLikeSvg(const std::string& bytes) {
+    const std::string head = bytes.substr(0, 1024);
+    return head.find("<svg") != std::string::npos;
+}
+
+// Logos and icons on most sites are SVG: rasterise at their natural size (capped at maxDim).
+static bool DecodeSvg(const std::string& bytes, int maxDim, DecodedImage& out) {
+    std::string text = bytes;  // nsvgParse edits its input
+    NSVGimage* svg = nsvgParse(text.data(), "px", 96.0f);
+    if (!svg) return false;
+    float w = svg->width, h = svg->height;
+    if (w <= 0 || h <= 0) {
+        nsvgDelete(svg);
+        return false;
+    }
+    const float scale = std::min(1.0f, (float)maxDim / std::max(w, h));
+    const int iw = std::max(1, (int)std::lround(w * scale)), ih = std::max(1, (int)std::lround(h * scale));
+    std::string px((size_t)iw * ih * 4, '\0');
+    NSVGrasterizer* r = nsvgCreateRasterizer();
+    if (r) nsvgRasterize(r, svg, 0, 0, scale, reinterpret_cast<unsigned char*>(px.data()), iw, ih, iw * 4);
+    nsvgDeleteRasterizer(r);
+    nsvgDelete(svg);
+    out = DecodedImage{};
+    out.w = iw;
+    out.h = ih;
+    out.frames.push_back(std::move(px));
+    out.delaysMs.push_back(0);
+    return true;
+}
+
 bool Decode(const std::string& bytes, int maxDim, int maxFrames, DecodedImage& out) {
     const uint8_t* d = reinterpret_cast<const uint8_t*>(bytes.data());
     const size_t n = bytes.size();
     if (n > 6 && memcmp(d, "GIF8", 4) == 0) return Anim::DecodeGif(d, n, maxDim, kAnimBudget, maxFrames, out);
     if (n > 12 && memcmp(d, "RIFF", 4) == 0 && memcmp(d + 8, "WEBP", 4) == 0)
         return Anim::DecodeWebP(d, n, maxDim, kAnimBudget, maxFrames, out);
+    if (LooksLikeSvg(bytes)) return DecodeSvg(bytes, maxDim, out);
     int w = 0, h = 0, comp = 0;
     unsigned char* px = stbi_load_from_memory(d, (int)n, &w, &h, &comp, 4);
     if (!px) return false;

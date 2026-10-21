@@ -43,10 +43,20 @@ void PutDataImage(const std::string& url) {
     if (comma == std::string::npos) return;
     std::string meta = url.substr(5, comma - 5);
     std::string payload = url.substr(comma + 1);
-    std::string bytes = payload;
+    std::string bytes;
     if (Str::EndsWith(meta, ";base64")) {
         std::vector<uint8_t> raw = Str::Base64Decode(payload);
         bytes.assign(raw.begin(), raw.end());
+    } else {  // percent-encoded text, usually an inline SVG icon
+        for (size_t i = 0; i < payload.size(); i++) {
+            if (payload[i] == '%' && i + 2 < payload.size() && isxdigit((unsigned char)payload[i + 1]) &&
+                isxdigit((unsigned char)payload[i + 2])) {
+                bytes += (char)strtol(payload.substr(i + 1, 2).c_str(), nullptr, 16);
+                i += 2;
+            } else {
+                bytes += payload[i];
+            }
+        }
     }
     DecodedImage img;
     if (!Images::Decode(bytes, 1024, 1, img) || img.frames.empty()) return;
