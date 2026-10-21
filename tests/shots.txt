@@ -1,0 +1,55 @@
+# Driven by CI: ./build/browsenx --script tests/shots.txt preview
+# Start page
+wait
+shot 01-home
+
+# Local test page: layout, forms, a <select> picker, a checkbox
+open file://$PWD/tests/page.html
+wait
+shot 02-test-page
+point select[name=size]
+press A
+shot 03-select-picker
+press DOWN
+press A
+point input[name=agree]
+press A
+shot 04-form-changed
+scroll 600
+shot 05-test-page-lower
+
+# Real sites
+open https://example.com/
+wait
+shot 06-example
+open https://en.wikipedia.org/wiki/Nintendo_Switch
+wait
+shot 07-wikipedia
+scroll 1500
+shot 08-wikipedia-scrolled
+
+# A file link goes to the "What type of file is this?" prompt, then into sdmc:/switch/
+open https://github.com/ad3333m/switch-lite-duck/releases/download/latest/LightBrowser.nro
+wait
+shot 09-download-prompt
+press A
+waitdl
+expect data/sd/switch/LightBrowser.nro
+open about:downloads
+wait
+shot 10-downloads
+
+# A link with no extension that the server marks as a download
+open https://httpbin.org/response-headers?Content-Type=application/octet-stream&Content-Disposition=attachment%3B%20filename%3Dtest.nsp
+wait
+shot 11-sniffed-download
+press B
+
+# Typing into a search box submits its form
+open file://$PWD/tests/page.html
+wait
+point input[name=q]
+type switch homebrew
+press A
+wait
+shot 12-search-results

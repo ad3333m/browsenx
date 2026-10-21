@@ -1,0 +1,9 @@
+build/
+BrowseNX.nro
+BrowseNX.elf
+BrowseNX.nacp
+BrowseNX.map
+data/
+preview/
+*.o
+*.d

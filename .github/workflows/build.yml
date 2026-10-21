@@ -1,0 +1,77 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: desktop tests + screenshots
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake pkg-config libsdl2-dev libfreetype-dev \
+            libcurl4-openssl-dev libwebp-dev zlib1g-dev fonts-dejavu-core >/dev/null
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build -j$(nproc)
+      - name: Unit tests
+        run: ./build/test_urlutil
+      - name: Screenshots
+        run: |
+          mkdir -p preview
+          ./build/browsenx --script tests/shots.txt preview
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preview
+          path: |
+            preview/*
+            data/log.txt
+
+  switch:
+    name: Switch nro
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Portlibs
+        run: |
+          dkp-pacman -S --noconfirm --needed switch-sdl2 switch-freetype switch-curl \
+            switch-libwebp switch-zlib switch-bzip2 switch-libpng switch-mbedtls || true
+          $DEVKITPRO/portlibs/switch/bin/aarch64-none-elf-pkg-config --exists sdl2 freetype2 libcurl libwebp
+      - name: Build
+        run: make -j$(nproc)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BrowseNX
+          path: BrowseNX.nro
+      - name: Publish
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          if ! command -v gh >/dev/null; then
+            curl -fsSL https://github.com/cli/cli/releases/download/v2.100.0/gh_2.100.0_linux_amd64.tar.gz | tar xz -C /tmp
+            export PATH="/tmp/gh_2.100.0_linux_amd64/bin:$PATH"
+          fi
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          gh release view latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create latest --repo "$GITHUB_REPOSITORY" --title "BrowseNX" --notes "Latest build."
+          for i in 1 2 3 4; do
+            gh release upload latest BrowseNX.nro --clobber --repo "$GITHUB_REPOSITORY" && exit 0
+            echo "upload failed, retrying in $((i * 10))s"; sleep $((i * 10))
+          done
+          exit 1

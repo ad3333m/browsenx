@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>BrowseNX test page</title>
+<style>
+  body { font-family: sans-serif; margin: 0; color: #222; }
+  header { background: linear-gradient(90deg, #3d7bff, #8a5cff); color: white; padding: 24px 40px; }
+  header h1 { margin: 0; font-size: 34px; }
+  main { padding: 20px 40px; }
+  .cards { display: flex; gap: 16px; margin: 16px 0; }
+  .card { flex: 1; border: 1px solid #d0d7de; border-radius: 12px; padding: 14px; background: #f6f8fa; }
+  .card h3 { margin: 0 0 6px 0; }
+  table { border-collapse: collapse; margin: 12px 0; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 12px; text-align: left; }
+  th { background: #eaeef2; }
+  form { background: #fff8e6; border: 2px dashed #d29922; padding: 14px; border-radius: 8px; }
+  code { background: #eff1f3; padding: 2px 5px; border-radius: 4px; font-family: monospace; }
+  blockquote { border-left: 4px solid #3d7bff; margin: 12px 0; padding: 4px 14px; color: #555; }
+  .pill { display: inline-block; background: #3fb950; color: white; border-radius: 12px; padding: 2px 10px; }
+</style>
+</head>
+<body>
+<header><h1>BrowseNX test page</h1><div>Everything the renderer has to get right, on one page.</div></header>
+<main>
+  <p>Plain text with <b>bold</b>, <i>italic</i>, <u>underline</u>, <s>strike</s>, <code>code</code> and a
+     <a href="https://example.com/">link to example.com</a>. Café, naïve, 日本語, 한국어.</p>
+
+  <div class="cards">
+    <div class="card"><h3>Flexbox</h3>Three cards in a row with rounded corners.</div>
+    <div class="card"><h3>Inline image</h3><img width="48" height="48" alt="png" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWUlEQVR4nGP4z3Di/2eeE/+fS5z4f1vlxP/zBif+H7Y58X+7x4n/q0NO/J+fcOL/5JwT/9srTvyvbjnxP3/Cif/Jc078D19x4r/3lhP/GUYNGDVg1IDhYgAAyn/GHxaYjOAAAAAASUVORK5CYII="> data: URI</div>
+    <div class="card"><h3>Badge</h3><span class="pill">Ready</span></div>
+  </div>
+
+  <form action="https://html.duckduckgo.com/html/" method="get">
+    <b>Search form</b><br>
+    <input type="search" name="q" placeholder="Search DuckDuckGo" style="width: 360px">
+    <select name="size"><option>Small</option><option selected>Medium</option><option>Large</option></select>
+    <label><input type="checkbox" name="agree"> Remember</label>
+    <input type="submit" value="Search">
+  </form>
+
+  <h2>Lists</h2>
+  <ul><li>Unordered one</li><li>Unordered two<ul><li>Nested</li></ul></li></ul>
+  <ol><li>First</li><li>Second</li><li>Third</li></ol>
+
+  <h2>Table</h2>
+  <table>
+    <tr><th>Type</th><th>Folder</th></tr>
+    <tr><td>NRO</td><td>sdmc:/switch/</td></tr>
+    <tr><td>NSP</td><td>sdmc:/games/nsp/</td></tr>
+  </table>
+
+  <blockquote>A quote with a coloured left border.</blockquote>
+  <pre>preformatted
+    text keeps   its spaces</pre>
+  <p id="end">End of the page. <a href="#top">Back to top</a></p>
+</main>
+</body>
+</html>
