@@ -45,7 +45,7 @@ int I(JSContext* c, JSValueConst v) {
     return i;
 }
 
-JSValue Str(JSContext* c, const std::string& s) { return JS_NewStringLen(c, s.data(), s.size()); }
+JSValue JStr(JSContext* c, const std::string& s) { return JS_NewStringLen(c, s.data(), s.size()); }
 
 std::string Resolve(const std::string& base, const std::string& href) {
     return litehtml::resolve(litehtml::url(base), litehtml::url(href)).str();
@@ -123,7 +123,7 @@ NATIVE(n_kind) {
 
 NATIVE(n_tag) {
     EL(0);
-    return Str(c, Forms::Tag(el));
+    return JStr(c, Forms::Tag(el));
 }
 
 NATIVE(n_parent) {
@@ -145,7 +145,7 @@ NATIVE(n_kids) {
 NATIVE(n_attr) {
     EL(0);
     const char* v = el->get_attr(S(c, argv[1]).c_str());
-    return v ? Str(c, v) : JS_NULL;
+    return v ? JStr(c, v) : JS_NULL;
 }
 
 NATIVE(n_setAttr) {
@@ -169,7 +169,7 @@ NATIVE(n_attrNames) {
     uint32_t i = 0;
     if (const litehtml::string_map* a = el->attrs())
         for (auto& kv : *a)
-            if (kv.first.rfind("nx-", 0) != 0) JS_SetPropertyUint32(c, arr, i++, Str(c, kv.first));
+            if (kv.first.rfind("nx-", 0) != 0) JS_SetPropertyUint32(c, arr, i++, JStr(c, kv.first));
     return arr;
 }
 
@@ -177,7 +177,7 @@ NATIVE(n_text) {
     EL(0);
     std::string t;
     el->get_text(t);
-    return Str(c, t);
+    return JStr(c, t);
 }
 
 // Replaces el's children (or, for a text node, el itself) with parsed text.
@@ -207,14 +207,14 @@ NATIVE(n_html) {
     EL(0);
     std::string out;
     for (auto& k : el->children()) Serialize(k, out);
-    return Str(c, out);
+    return JStr(c, out);
 }
 
 NATIVE(n_outer) {
     EL(0);
     std::string out;
     Serialize(el, out);
-    return Str(c, out);
+    return JStr(c, out);
 }
 
 NATIVE(n_setHTML) {
@@ -297,7 +297,7 @@ NATIVE(n_display) {
     EL(0);
     static const std::vector<std::string> kNames = Str::Split(style_display_strings, ';');
     int d = (int)el->css().get_display();
-    return Str(c, d >= 0 && d < (int)kNames.size() ? kNames[d] : "block");
+    return JStr(c, d >= 0 && d < (int)kNames.size() ? kNames[d] : "block");
 }
 
 NATIVE(n_viewport) {
@@ -349,12 +349,12 @@ NATIVE(n_setUrl) {
 
 NATIVE(n_url) {
     (void)argc, (void)argv;
-    return Str(c, E(c)->url);
+    return JStr(c, E(c)->url);
 }
 
 NATIVE(n_resolve) {
     (void)argc;
-    return Str(c, Resolve(S(c, argv[0]), S(c, argv[1])));
+    return JStr(c, Resolve(S(c, argv[0]), S(c, argv[1])));
 }
 
 NATIVE(n_log) {
@@ -373,7 +373,7 @@ NATIVE(n_alert) {
 NATIVE(n_prompt) {
     std::string out;
     if (!Platform::Keyboard(S(c, argv[0]), argc > 1 ? S(c, argv[1]) : "", out, 1000)) return JS_NULL;
-    return Str(c, out);
+    return JStr(c, out);
 }
 
 NATIVE(n_storage) {
@@ -381,7 +381,7 @@ NATIVE(n_storage) {
     std::string op = S(c, argv[0]);
     if (op == "get") {
         auto it = m.find(S(c, argv[1]));
-        return it == m.end() ? JS_NULL : Str(c, it->second);
+        return it == m.end() ? JS_NULL : JStr(c, it->second);
     }
     if (op == "set") m[S(c, argv[1])] = S(c, argv[2]);
     else if (op == "del") m.erase(S(c, argv[1]));
@@ -389,7 +389,7 @@ NATIVE(n_storage) {
     else if (op == "keys") {
         JSValue arr = JS_NewArray(c);
         uint32_t i = 0;
-        for (auto& kv : m) JS_SetPropertyUint32(c, arr, i++, Str(c, kv.first));
+        for (auto& kv : m) JS_SetPropertyUint32(c, arr, i++, JStr(c, kv.first));
         return arr;
     }
     (void)argc;
@@ -401,7 +401,7 @@ NATIVE(n_cookie) {
         Http::SetCookie(E(c)->url, S(c, argv[0]));
         return JS_UNDEFINED;
     }
-    return Str(c, Http::CookieHeader(E(c)->url));
+    return JStr(c, Http::CookieHeader(E(c)->url));
 }
 
 NATIVE(n_fetch) {
@@ -708,8 +708,8 @@ void JsEngine::Fetch(int requestId, const std::string& method, const std::string
         Async::Post([this, alive, r, requestId] {
             auto a = alive.lock();
             if (!a || !*a) return;
-            JSValue args[6] = {JS_NewInt32(ctx_, requestId), JS_NewInt32(ctx_, r->status == 0 && r->Ok() ? 200 : (int)r->status), Str(ctx_, r->body),
-                               Str(ctx_, r->headers), Str(ctx_, r->finalUrl), Str(ctx_, r->error)};
+            JSValue args[6] = {JS_NewInt32(ctx_, requestId), JS_NewInt32(ctx_, r->status == 0 && r->Ok() ? 200 : (int)r->status), JStr(ctx_, r->body),
+                               JStr(ctx_, r->headers), JStr(ctx_, r->finalUrl), JStr(ctx_, r->error)};
             JSValue global = JS_GetGlobalObject(ctx_);
             JSValue fn = JS_GetPropertyStr(ctx_, global, "__nxFetchDone");
             Arm(5000);
