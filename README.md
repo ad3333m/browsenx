@@ -34,10 +34,16 @@ Downloads run in the background, one after another, and keep the console awake. 
 
 ## Limits
 
-There's no JavaScript. Most sites that serve their content as HTML work, including Wikipedia, news
-sites, GitHub, file listings and DuckDuckGo's HTML search. Sites built entirely in JavaScript don't.
-For those, **+ › Open in Nintendo's browser** shows the page in the system web applet, which can't
-download. That needs BrowseNX started through a game (hold R), not from the album.
+JavaScript runs on [QuickJS](https://github.com/quickjs-ng/quickjs) with a DOM built over the page
+(`source/js/`): scripts (inline, external and modules), DOM changes, events, timers, `fetch`,
+`XMLHttpRequest`, `localStorage`, cookies, `URL` and `IntersectionObserver`. Menus, tabs, buttons,
+script-driven forms and download buttons work. There's no canvas, video, WebSocket or shadow DOM,
+and big app-style sites (Google Docs, YouTube) are too heavy. **+ › Turn JavaScript off** gives
+simpler, faster pages, and **+ › JavaScript console** shows a page's messages and errors.
+
+For anything BrowseNX can't show, **+ › Open in Nintendo's browser** opens the page in the system
+web applet, which can't download. That needs BrowseNX started through a game (hold R), not from the
+album.
 
 Forms work (text boxes, checkboxes, radio buttons, dropdowns, GET and POST); file uploads don't.
 Cookies last until you close the app.
@@ -48,4 +54,5 @@ The `.nro` is built by GitHub Actions in the `devkitpro/devkita64` container (`m
 job builds the same code against desktop SDL2 and runs `tests/test_urlutil.cpp`. It also drives
 the app offscreen through `tests/shots.txt` and uploads the screenshots as the `preview` artifact.
 
-`tools/make_icon.py` redraws `icon.jpg`.
+`tools/make_icon.py` redraws `icon.jpg`. `tools/patch_litehtml.py` re-applies BrowseNX's DOM patches
+(marked "BrowseNX patch") if litehtml is re-vendored.
