@@ -70,7 +70,11 @@ size_t OnHeader(char* buf, size_t size, size_t nitems, void* user) {
         r->contentType.clear();
         r->disposition.clear();
         r->contentLength = 0;
-    } else if (n > sizeof(kRetry) - 1 && strncasecmp(buf, kRetry, sizeof(kRetry) - 1) == 0) {
+        r->headers.clear();
+        return n;
+    }
+    if (n > 2) r->headers.append(buf, n);
+    if (n > sizeof(kRetry) - 1 && strncasecmp(buf, kRetry, sizeof(kRetry) - 1) == 0) {
         r->retryAfter = atof(buf + sizeof(kRetry) - 1);
     } else if (n > sizeof(kType) - 1 && strncasecmp(buf, kType, sizeof(kType) - 1) == 0) {
         r->contentType = HeaderValue(buf, n, sizeof(kType) - 1);
@@ -108,6 +112,77 @@ void ShareCookies(void* handle) {
     CURL* c = static_cast<CURL*>(handle);
     if (g_share) curl_easy_setopt(c, CURLOPT_SHARE, g_share);
     curl_easy_setopt(c, CURLOPT_COOKIEFILE, "");  // turns the cookie engine on
+}
+
+namespace {
+
+std::string HostOf(const std::string& url) {
+    size_t a = url.find("://");
+    a = a == std::string::npos ? 0 : a + 3;
+    size_t b = url.find_first_of("/:?#", a);
+    std::string h = url.substr(a, b == std::string::npos ? std::string::npos : b - a);
+    for (char& ch : h) ch = (char)tolower((unsigned char)ch);
+    return h;
+}
+
+}  // namespace
+
+std::string CookieHeader(const std::string& url) {
+    CURL* c = curl_easy_init();
+    if (!c) return "";
+    ShareCookies(c);
+    struct curl_slist* list = nullptr;
+    curl_easy_getinfo(c, CURLINFO_COOKIELIST, &list);
+    const std::string host = HostOf(url);
+    std::string out;
+    for (struct curl_slist* l = list; l; l = l->next) {
+        // Netscape format: domain, subdomains, path, secure, expiry, name, value (tab separated).
+        std::vector<std::string> f;
+        std::string cur;
+        for (const char* p = l->data; *p; p++) {
+            if (*p == '\t') {
+                f.push_back(cur);
+                cur.clear();
+            } else {
+                cur += *p;
+            }
+        }
+        f.push_back(cur);
+        if (f.size() < 7 || f[0].rfind("#HttpOnly_", 0) == 0) continue;  // HttpOnly: hidden from scripts
+        std::string d = f[0][0] == '.' ? f[0].substr(1) : f[0];
+        bool match = host == d || (host.size() > d.size() && host.compare(host.size() - d.size() - 1, std::string::npos,
+                                                                          "." + d) == 0);
+        if (match) out += (out.empty() ? "" : "; ") + f[5] + "=" + f[6];
+    }
+    curl_slist_free_all(list);
+    curl_easy_cleanup(c);
+    return out;
+}
+
+void SetCookie(const std::string& url, const std::string& cookie) {
+    CURL* c = curl_easy_init();
+    if (!c) return;
+    ShareCookies(c);
+    std::string nameValue = cookie.substr(0, cookie.find(';'));
+    size_t eq = nameValue.find('=');
+    if (eq == std::string::npos) eq = nameValue.size();
+    std::string name = nameValue.substr(0, eq), value = eq < nameValue.size() ? nameValue.substr(eq + 1) : "";
+    std::string domain, path = "/";
+    long long expiry = 0;  // session cookie
+    for (size_t p = cookie.find(';'); p != std::string::npos; p = cookie.find(';', p + 1)) {
+        std::string attr = cookie.substr(p + 1, cookie.find(';', p + 1) - p - 1);
+        while (!attr.empty() && attr[0] == ' ') attr.erase(0, 1);
+        std::string low = attr;
+        for (char& ch : low) ch = (char)tolower((unsigned char)ch);
+        if (low.rfind("domain=", 0) == 0) domain = attr.substr(7);
+        else if (low.rfind("path=", 0) == 0) path = attr.substr(5);
+        else if (low.rfind("max-age=", 0) == 0 && atoll(attr.c_str() + 8) <= 0) expiry = 1;  // delete
+    }
+    while (!domain.empty() && domain[0] == '.') domain.erase(0, 1);
+    std::string line = (domain.empty() ? HostOf(url) : "." + domain) + "\t" + (domain.empty() ? "FALSE" : "TRUE") +
+                       "\t" + path + "\tFALSE\t" + std::to_string(expiry) + "\t" + name + "\t" + value;
+    curl_easy_setopt(c, CURLOPT_COOKIELIST, line.c_str());
+    curl_easy_cleanup(c);
 }
 
 const char* UserAgent() {

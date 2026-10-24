@@ -462,6 +462,23 @@ bool element::is_nth_last_child(const element::ptr& /*el*/, int /*num*/, int /*o
 bool element::is_nth_child(const element::ptr&, int /*num*/, int /*off*/, bool /*of_type*/, const css_selector::vector& /*selector_list*/) const LITEHTML_RETURN_FUNC(false)
 bool element::is_only_child(const element::ptr& /*el*/, bool /*of_type*/) const		LITEHTML_RETURN_FUNC(false)
 void element::get_content_size( size& /*sz*/, pixel_t /*max_width*/ )				LITEHTML_EMPTY_FUNC
+// BrowseNX patch
+bool element::insertBefore(const ptr& el, const ptr& before)
+{
+	if (!el) return false;
+	auto it = m_children.begin();
+	while (it != m_children.end() && *it != before) ++it;
+	m_children.insert(it, el);
+	el->parent(shared_from_this());
+	return true;
+}
+
+void element::reset_styles()
+{
+	m_used_styles.clear();
+	for (auto& el : m_children) el->reset_styles();
+}
+
 bool element::appendChild(const ptr &/*el*/)										LITEHTML_RETURN_FUNC(false)
 bool element::removeChild(const ptr &/*el*/)										LITEHTML_RETURN_FUNC(false)
 void element::clearRecursive()														LITEHTML_EMPTY_FUNC

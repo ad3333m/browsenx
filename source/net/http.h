@@ -27,6 +27,7 @@ struct Response {
     std::string disposition;   // Content-Disposition, as sent
     std::string finalUrl;      // after redirects
     uint64_t contentLength = 0;
+    std::string headers;       // every header line of the final response, for fetch()
     bool isFile = false;       // stopOnFile tripped: body is empty, nothing was read
     bool Ok() const { return status >= 200 && status < 300; }
 };
@@ -45,6 +46,9 @@ bool IsDownload(const std::string& contentType, const std::string& disposition);
 const char* UserAgent();
 // Joins every handle to one cookie jar so a login on a page carries over to its downloads.
 void ShareCookies(void* curlHandle);
+// document.cookie: the "a=1; b=2" string for url, and storing a Set-Cookie style string.
+std::string CookieHeader(const std::string& url);
+void SetCookie(const std::string& url, const std::string& cookie);
 // Makes every transfer in flight fail fast (used when quitting).
 void AbortAll();
 

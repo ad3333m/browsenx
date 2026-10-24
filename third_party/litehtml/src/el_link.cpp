@@ -10,6 +10,7 @@ litehtml::el_link::el_link(const std::shared_ptr<document>& doc) : litehtml::htm
 
 void litehtml::el_link::parse_attributes()
 {
+	if (m_processed) return;  // BrowseNX patch: the sheet is in already
 	bool processed = false;
 
 	document::ptr doc = get_document();
@@ -32,6 +33,7 @@ void litehtml::el_link::parse_attributes()
 		}
 	}
 
+	m_processed = processed;
 	if(!processed)
 	{
 		doc->container()->link(doc, shared_from_this());

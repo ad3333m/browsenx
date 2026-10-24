@@ -9,6 +9,8 @@ litehtml::el_style::el_style(const std::shared_ptr<document>& doc) : element(doc
 
 void litehtml::el_style::parse_attributes()
 {
+	if (m_parsed) return;  // BrowseNX patch
+	m_parsed = true;
 	string text;
 
 	for(auto& el : m_children)

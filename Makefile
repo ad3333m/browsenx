@@ -32,7 +32,7 @@ ARCH     := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS   := -g -Wall -O2 -ffunction-sections $(ARCH) $(DEFINES) $(INCLUDE) -D__SWITCH__ \
             $(shell $(PKGCONF) --cflags $(PKGS))
 CXXFLAGS := $(CFLAGS) -std=gnu++20 -fexceptions
-CFLAGS   += -std=gnu99
+CFLAGS   += -std=gnu11
 ASFLAGS  := -g $(ARCH)
 LDFLAGS   = -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 LIBS     := -lwebpdemux $(shell $(PKGCONF) --libs $(PKGS)) -lz -lnx

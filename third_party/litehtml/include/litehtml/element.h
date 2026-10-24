@@ -78,6 +78,11 @@ namespace litehtml
 		virtual bool				appendChild(const ptr &el);
 		virtual bool				removeChild(const ptr &el);
 		virtual void				clearRecursive();
+		// BrowseNX patch: DOM mutation for JavaScript
+		virtual bool				insertBefore(const ptr& el, const ptr& before);
+		virtual void				remove_attr(const char* /*name*/) {}
+		virtual const string_map*	attrs() const { return nullptr; }
+		virtual void				reset_styles();
 
 		virtual string_id			id() const;
 		virtual string_id			tag() const;

@@ -8,6 +8,7 @@ namespace litehtml
 	class el_style : public element
 	{
 		elements_list		m_children;
+		bool				m_parsed = false;  // BrowseNX patch
 	public:
 		explicit el_style(const std::shared_ptr<document>& doc);
 

@@ -10,6 +10,7 @@ namespace litehtml
 	public:
 		explicit el_link(const std::shared_ptr<litehtml::document>& doc);
 
+		bool m_processed = false;  // BrowseNX patch
 	protected:
 		void parse_attributes() override;
 	};

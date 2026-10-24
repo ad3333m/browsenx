@@ -117,6 +117,7 @@ document::ptr document::createFromString(
 		}
 		// Sort css selectors using CSS rules.
 		doc->m_styles.sort_selectors();
+		doc->m_css_parsed = doc->m_css.size();  // BrowseNX patch
 
 		// Apply media features.
 		doc->update_media_lists(doc->m_media);
@@ -1087,6 +1088,50 @@ void document::fix_table_parent(const std::shared_ptr<render_item>& el_ptr, styl
 			annon_ri->parent(parent);
 		}
 	}
+}
+
+// BrowseNX patch
+elements_list document::parse_fragment(const char* str)
+{
+	GumboOptions opts = kGumboDefaultOptions;
+	opts.fragment_context = GUMBO_TAG_BODY;
+	GumboOutput* output = gumbo_parse_with_options(&opts, str, strlen(str));
+	elements_list child_elements;
+	create_node(output->root, child_elements, true, false);
+	gumbo_destroy_output(&kGumboDefaultOptions, output);
+	return child_elements;
+}
+
+void document::restyle()
+{
+	m_root->reset_styles();
+	m_root->apply_stylesheet(m_master_css);
+	m_root->parse_attributes();  // also picks up <style>/<link> added since last time
+	if (m_css.size() > m_css_parsed)
+	{
+		for (size_t i = m_css_parsed; i < m_css.size(); i++)
+		{
+			const auto& css = m_css[i];
+			media_query_list_list::ptr media;
+			if (css.media != "")
+			{
+				auto mq_list = parse_media_query_list(css.media, shared_from_this());
+				media = make_shared<media_query_list_list>();
+				media->add(mq_list);
+			}
+			m_styles.parse_css_stylesheet(css.text, css.baseurl, shared_from_this(), media);
+		}
+		m_css_parsed = m_css.size();
+		m_styles.sort_selectors();
+		update_media_lists(m_media);
+	}
+	m_root->apply_stylesheet(m_styles);
+	m_root->apply_stylesheet(m_user_css);
+	m_root->compute_styles();
+	m_tabular_elements.clear();
+	m_root_render = m_root->create_render_item(nullptr);
+	fix_tables_layout();
+	if (m_root_render) m_root_render = m_root_render->init();
 }
 
 void document::append_children_from_string(element& parent, const char* str, bool replace_existing)

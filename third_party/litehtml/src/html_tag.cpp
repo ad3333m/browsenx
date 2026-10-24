@@ -55,6 +55,22 @@ bool litehtml::html_tag::removeChild(const element::ptr &el)
 	return false;
 }
 
+// BrowseNX patch
+void litehtml::html_tag::remove_attr(const char* name)
+{
+	if (!name) return;
+	string n = lowcase(name);
+	m_attrs.erase(n);
+	if (n == "class") { m_str_classes.clear(); m_classes.clear(); }
+	else if (n == "id") m_id = empty_id;
+}
+
+void litehtml::html_tag::reset_styles()
+{
+	m_style.clear();
+	element::reset_styles();
+}
+
 void litehtml::html_tag::clearRecursive()
 {
 	for(auto& el : m_children)

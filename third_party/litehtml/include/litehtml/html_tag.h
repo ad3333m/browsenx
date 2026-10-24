@@ -39,6 +39,10 @@ namespace litehtml
 		bool				appendChild(const element::ptr& el) override;
 		bool				removeChild(const element::ptr& el) override;
 		void				clearRecursive() override;
+		// BrowseNX patch
+		void				remove_attr(const char* name) override;
+		const string_map*	attrs() const override { return &m_attrs; }
+		void				reset_styles() override;
 		string_id			tag() const override;
 		string_id			id() const override;
 		const char*			get_tagName() const override;

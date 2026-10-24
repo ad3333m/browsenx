@@ -55,6 +55,7 @@ namespace litehtml
 		document_container*					m_container;
 		fonts_map							m_fonts;
 		css_text::vector					m_css;
+		size_t							m_css_parsed = 0;  // BrowseNX patch
 		litehtml::css						m_styles;
 		litehtml::web_color					m_def_color;
 		litehtml::css						m_master_css;
@@ -106,6 +107,9 @@ namespace litehtml
 		std::shared_ptr<const element>	get_over_element() const { return m_over_element; }
 
 		void							append_children_from_string(element& parent, const char* str, bool replace_existing);
+		// BrowseNX patch: innerHTML and re-applying CSS after scripts change the tree
+		elements_list					parse_fragment(const char* html);
+		void							restyle();
 		void							dump(dumper& cout);
 
 		// see doc/document_createFromString.txt
