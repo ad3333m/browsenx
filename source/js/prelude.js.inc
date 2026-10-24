@@ -6,6 +6,7 @@ R"JS(
 const nx = globalThis.__nx;
 const G = globalThis;
 const nodes = new Map();          // id -> Node
+const ROOT = nx.root();           // <html>; litehtml never replaces it
 let constructingId = 0;           // wrap() passes the id to custom element constructors
 let currentScript = 0;
 let readyState = 'loading';
@@ -197,7 +198,7 @@ class Node extends EventTarget {
   }
   get nodeType() { return 1; }
   get ownerDocument() { return document; }
-  get parentNode() { const p = nx.parent(this._id); return p ? wrap(p) : (this._id === nx.root() ? document : null); }
+  get parentNode() { const p = nx.parent(this._id); return p ? wrap(p) : (this._id === ROOT ? document : null); }
   get parentElement() { const p = nx.parent(this._id); return p ? wrap(p) : null; }
   get childNodes() { return nodeList(ids(nx.kids(this._id))); }
   get firstChild() { const k = nx.kids(this._id); return k.length ? wrap(k[0]) : null; }
@@ -212,17 +213,20 @@ class Node extends EventTarget {
   }
   get nextSibling() { return this._sibling(1, false); }
   get previousSibling() { return this._sibling(-1, false); }
-  get isConnected() { let id = this._id, r = nx.root(); while (id && id !== r) id = nx.parent(id); return id === r; }
+  get isConnected() { return nx.connected(this._id); }
   get textContent() { return nx.text(this._id); }
   set textContent(v) { nx.setText(this._id, v == null ? '' : String(v)); }
   get nodeValue() { return null; }
   set nodeValue(v) {}
   hasChildNodes() { return nx.kids(this._id).length > 0; }
-  contains(o) { for (let n = o; n; n = n.parentNode) if (n === this) return true; return false; }
+  contains(o) {
+    if (!o || o === document || !(o instanceof Node)) return false;
+    return o === this || (nx.compare(this._id, o._id) & 16) !== 0;
+  }
   getRootNode() { return this.isConnected ? document : this; }
   isSameNode(o) { return o === this; }
   isEqualNode(o) { return !!o && o.outerHTML === this.outerHTML; }
-  compareDocumentPosition(o) { return this.contains(o) ? 20 : o && o.contains(this) ? 10 : 4; }
+  compareDocumentPosition(o) { return o === document ? 10 : o instanceof Node ? nx.compare(this._id, o._id) : 1 | 32 | 4; }
   normalize() {}
   appendChild(c) { return this.insertBefore(c, null); }
   insertBefore(c, ref) {
@@ -448,7 +452,7 @@ class Element extends Node {
   get nextElementSibling() { return this._sibling(1, true); }
   get previousElementSibling() { return this._sibling(-1, true); }
   querySelectorAll(sel) { return nodeList(ids(nx.select(this._id, fixSelector(sel)))); }
-  querySelector(sel) { const r = nx.select(this._id, fixSelector(sel)); return r.length ? wrap(r[0]) : null; }
+  querySelector(sel) { const r = nx.select(this._id, fixSelector(sel), true); return r.length ? wrap(r[0]) : null; }
   getElementsByTagName(t) { return this.querySelectorAll(t === '*' ? '*' : t); }
   getElementsByClassName(c) { return this.querySelectorAll(String(c).trim().split(/\s+/).map(x => '.' + x).join('')); }
   matches(sel) { return nx.matches(this._id, fixSelector(sel)); }
@@ -735,8 +739,9 @@ class Document extends Node {
   get childNodes() { return nodeList([this.documentElement]); }
   get firstChild() { return this.documentElement; }
   get children() { return nodeList([this.documentElement]); }
-  get head() { return this.querySelector('head'); }
-  get body() { return this.querySelector('body'); }
+  get head() { const h = nx.kids(ROOT).find(k => nx.tag(k) === 'head'); return h ? wrap(h) : null; }
+  get body() { const b = nx.kids(ROOT).find(k => nx.tag(k) === 'body'); return b ? wrap(b) : null; }
+  compareDocumentPosition(o) { return o === this ? 0 : 20; }
   get title() { const t = this.querySelector('title'); return t ? t.textContent.trim() : ''; }
   set title(v) { let t = this.querySelector('title'); if (!t && this.head) { t = this.createElement('title'); this.head.appendChild(t); } if (t) t.textContent = v; }
   get readyState() { return readyState; }
@@ -1173,12 +1178,19 @@ class IntersectionObserver {
       if (visible !== was) {
         this._t.set(el, visible);
         entries.push({ target: el, isIntersecting: visible, intersectionRatio: visible ? 1 : 0, boundingClientRect: r,
-          intersectionRect: visible ? r : rectOf(document.body), rootBounds: { top: 0, left: 0, width: v[0], height: v[1] }, time: now });
+          intersectionRect: visible ? r : { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }, rootBounds: { top: 0, left: 0, width: v[0], height: v[1] }, time: now });
       }
     }
     if (entries.length) { try { this._cb(entries, this); } catch (e) { report(e, 'IntersectionObserver'); } }
   }
 }
+class PerformanceObserver {
+  constructor(cb) { this._cb = cb; }
+  observe() {}
+  disconnect() {}
+  takeRecords() { return []; }
+}
+PerformanceObserver.supportedEntryTypes = [];
 class ResizeObserver {
   constructor(cb) { this._cb = cb; }
   observe(el) {
@@ -1258,7 +1270,7 @@ Object.assign(G, {
   HTMLUnknownElement: HTMLElement, SVGElement, NodeList, HTMLCollection: NodeList, DOMTokenList,
   URL, URLSearchParams, Location, Headers, Request, Response, Blob, File, FormData, XMLHttpRequest, TextEncoder,
   TextDecoder, DOMException, AbortController, AbortSignal, MutationObserver, IntersectionObserver, ResizeObserver,
-  DOMParser, Storage,
+  DOMParser, Storage, PerformanceObserver,
   customElements: new CustomElementRegistry(),
   localStorage: storageProxy(new Storage(true)),
   sessionStorage: storageProxy(new Storage(false)),

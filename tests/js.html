@@ -26,7 +26,7 @@
 <noscript><p class="row bad">This line is only shown without JavaScript.</p></noscript>
 <div id="list"></div>
 <p><button id="toggle" onclick="document.getElementById('panel').classList.toggle('open')">Show panel</button>
-   <a id="jslink" href="javascript:document.getElementById('linkout').textContent = 'javascript: link ran'">Run a javascript: link</a>
+   <a id="jslink" style="display:inline-block" href="javascript:document.getElementById('linkout').textContent = 'javascript: link ran'">Run a javascript: link</a>
    <span id="linkout"></span></p>
 <div id="panel">The button's onclick toggled this panel with classList.</div>
 <form id="f" action="https://example.com/should-not-go-here">

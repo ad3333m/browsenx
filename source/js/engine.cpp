@@ -1,5 +1,6 @@
 #include "js/engine.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <map>
@@ -262,12 +263,62 @@ NATIVE(n_remove) {
     return JS_UNDEFINED;
 }
 
+// "a, b > c" -> {"a", "b > c"}: litehtml's selector parser takes one selector at a time.
+std::vector<std::string> SplitSelectors(const std::string& s) {
+    std::vector<std::string> out;
+    int depth = 0;
+    char quote = 0;
+    std::string cur;
+    for (char ch : s) {
+        if (quote) {
+            if (ch == quote) quote = 0;
+        } else if (ch == '"' || ch == '\'') {
+            quote = ch;
+        } else if (ch == '(' || ch == '[') {
+            depth++;
+        } else if (ch == ')' || ch == ']') {
+            depth--;
+        } else if (ch == ',' && depth == 0) {
+            out.push_back(Str::Trim(cur));
+            cur.clear();
+            continue;
+        }
+        cur += ch;
+    }
+    out.push_back(Str::Trim(cur));
+    out.erase(std::remove(out.begin(), out.end(), std::string()), out.end());
+    return out;
+}
+
+// select(id, selector, firstOnly): descendants of id matching selector, in document order.
 NATIVE(n_select) {
     EL(0);
+    JsEngine* e = E(c);
+    const bool first = argc > 2 && JS_ToBool(c, argv[2]) > 0;
     JSValue arr = JS_NewArray(c);
     uint32_t i = 0;
     try {
-        for (auto& m : el->select_all(S(c, argv[1]))) JS_SetPropertyUint32(c, arr, i++, JS_NewInt32(c, E(c)->Id(m)));
+        auto parts = SplitSelectors(S(c, argv[1]));
+        if (parts.size() == 1 && first) {
+            if (auto m = el->select_one(parts[0])) JS_SetPropertyUint32(c, arr, 0, JS_NewInt32(c, e->Id(m)));
+        } else if (parts.size() == 1) {
+            for (auto& m : el->select_all(parts[0])) JS_SetPropertyUint32(c, arr, i++, JS_NewInt32(c, e->Id(m)));
+        } else if (!parts.empty()) {
+            std::unordered_set<const element*> hit;
+            for (auto& p : parts)
+                for (auto& m : el->select_all(p)) hit.insert(m.get());
+            std::function<bool(const element::ptr&)> walk = [&](const element::ptr& n) {
+                for (auto& k : n->children()) {
+                    if (hit.count(k.get())) {
+                        JS_SetPropertyUint32(c, arr, i++, JS_NewInt32(c, e->Id(k)));
+                        if (first) return true;
+                    }
+                    if (walk(k)) return true;
+                }
+                return false;
+            };
+            walk(el);
+        }
     } catch (...) {
     }
     return arr;
@@ -276,10 +327,38 @@ NATIVE(n_select) {
 NATIVE(n_matches) {
     EL(0);
     try {
-        return JS_NewBool(c, el->select(S(c, argv[1])) != litehtml::select_no_match);
+        for (auto& p : SplitSelectors(S(c, argv[1])))
+            if (el->select(p) != litehtml::select_no_match) return JS_TRUE;
     } catch (...) {
-        return JS_FALSE;
     }
+    return JS_FALSE;
+}
+
+// Node.compareDocumentPosition(other) bits for (a, b): what b is relative to a.
+NATIVE(n_compare) {
+    (void)argc;
+    JsEngine* e = E(c);
+    element::ptr a = e->El(I(c, argv[0])), b = e->El(I(c, argv[1]));
+    if (!a || !b) return JS_NewInt32(c, 1 | 32 | 4);
+    if (a == b) return JS_NewInt32(c, 0);
+    std::vector<element::ptr> pa, pb;  // ancestor chains, root first
+    for (auto n = a; n; n = n->parent()) pa.insert(pa.begin(), n);
+    for (auto n = b; n; n = n->parent()) pb.insert(pb.begin(), n);
+    if (pa[0] != pb[0]) return JS_NewInt32(c, 1 | 32 | 4);  // different trees
+    size_t k = 0;
+    while (k < pa.size() && k < pb.size() && pa[k] == pb[k]) k++;
+    if (k == pa.size()) return JS_NewInt32(c, 16 | 4);  // b is inside a
+    if (k == pb.size()) return JS_NewInt32(c, 8 | 2);   // b contains a
+    for (auto& child : pa[k - 1]->children()) {         // which branch comes first under the common parent
+        if (child == pa[k]) return JS_NewInt32(c, 4);
+        if (child == pb[k]) return JS_NewInt32(c, 2);
+    }
+    return JS_NewInt32(c, 4);
+}
+
+NATIVE(n_connected) {
+    EL(0);
+    return JS_NewBool(c, Attached(el, E(c)->doc->root()));
 }
 
 NATIVE(n_rect) {
@@ -464,6 +543,7 @@ const struct {
     {"alert", n_alert, 1},     {"prompt", n_prompt, 2},     {"storage", n_storage, 3},
     {"cookie", n_cookie, 1},   {"fetch", n_fetch, 5},       {"write", n_write, 1},
     {"over", n_over, 0},       {"dirty", n_dirty, 0},       {"now", n_now, 0},
+    {"compare", n_compare, 2}, {"connected", n_connected, 1},
 };
 
 // Modules: imports are fetched synchronously while the importing script runs.
@@ -733,7 +813,7 @@ bool JsEngine::Dispatch(const element::ptr& el, const char* type) {
     JSValue args[2] = {JS_NewInt32(ctx_, Id(el)), JS_NewString(ctx_, type)};
     JSValue global = JS_GetGlobalObject(ctx_);
     JSValue fn = JS_GetPropertyStr(ctx_, global, "__nxDispatch");
-    Arm(5000);
+    Arm(2000);
     JSValue ret = JS_Call(ctx_, fn, JS_UNDEFINED, 2, args);
     bool prevented = false;
     if (JS_IsException(ret)) {
@@ -757,7 +837,8 @@ void JsEngine::RunUrl(const std::string& code) {
 }
 
 bool JsEngine::Tick(double nowMs, bool scrolled) {
-    Arm(3000);
+    (void)nowMs;
+    Arm(1000);  // timers get a second per frame at most; a runaway one can't freeze the browser for long
     Call("__nxTick", "[" + std::to_string(nowMs) + "," + (scrolled ? "true" : "false") + "]");
     return TakeDirty();
 }
