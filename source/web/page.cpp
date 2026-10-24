@@ -115,8 +115,11 @@ void Page::Commit(const std::string& finalUrl, const std::string& html, const st
     charset_ = Charset(contentType);
     size_t hash = finalUrl.find('#');
     fragment_ = hash == std::string::npos ? "" : finalUrl.substr(hash + 1);
+    js_.reset();  // the old page's scripts stop before its document goes
     cssPass_ = 0;
     cssWaiting_ = 0;
+    cssInFlight_.clear();
+    restyleDue_ = false;
     box_.cssCache.clear();
     box_.waitingImages.clear();
     pendingScroll_ = restoreScroll;
@@ -138,8 +141,11 @@ void Page::Build(bool first) {
         if (enc != litehtml::encoding::null) src = litehtml::estring(html_, enc);
     }
     static const std::string kMaster = std::string(litehtml::master_css) + kUserCss;
+    static const std::string kMasterJs = kMaster + "noscript { display: none; }";
+    const bool js = jsEnabled && !Str::StartsWith(url, "about:");
+    js_.reset();
     doc_.reset();  // fonts of the old document go before the new one makes its own
-    doc_ = litehtml::document::createFromString(src, &box_, kMaster);
+    doc_ = litehtml::document::createFromString(src, &box_, js ? kMasterJs : kMaster);
     title = box_.title.empty() ? url : box_.title;
     if (doc_) doc_->render(view_.w);
     height = doc_ ? doc_->height() : 0;
@@ -147,6 +153,7 @@ void Page::Build(bool first) {
     dirty_ = true;
     if (!box_.missingCss.empty() && cssPass_ < 3) FetchMissingCss();
     layoutDue_ = false;
+    if (cssWaiting_ == 0) StartJs();  // scripts run on the final document, once its stylesheets are in
     if (!first) SetScroll(keep);  // stylesheets arrived: stay where the reader is
     else if (pendingScroll_ > 0) SetScroll(pendingScroll_);
     else ScrollToFragment();
@@ -156,6 +163,7 @@ void Page::FetchMissingCss() {
     cssPass_++;
     const int gen = gen_;
     for (const std::string& u : box_.missingCss) {
+        if (!cssInFlight_.insert(u).second) continue;
         cssWaiting_++;
         Async::Run(Async::Pool::Api, [this, gen, u] {
             Http::Request req;
@@ -166,7 +174,12 @@ void Page::FetchMissingCss() {
             Async::Post([this, gen, u, res] {
                 if (gen != gen_) return;
                 box_.cssCache[u] = res->Ok() ? res->body : "";
-                if (--cssWaiting_ == 0) Build(false);  // every sheet is in: lay out again with them
+                cssInFlight_.erase(u);
+                if (--cssWaiting_ > 0) return;
+                // Every sheet is in: lay out again with them. Once scripts run, the document can't be
+                // rebuilt (it would lose their changes), so a sheet a script added is applied by restyling.
+                if (js_) restyleDue_ = true;
+                else Build(false);
             });
         });
     }
@@ -182,7 +195,73 @@ void Page::ScrollToFragment() {
     if (el) SetScroll(el->get_placement().y);
 }
 
+void Page::StartJs() {
+    if (js_ || !jsEnabled || !doc_ || Str::StartsWith(url, "about:")) return;
+    JsEngine::Host h;
+    const int gen = gen_;
+    h.navigate = [this, gen](const std::string& u, const std::string& method, const std::string& body, bool replace) {
+        // Runs after the script returns: navigating replaces this page and its engine.
+        Async::Post([this, gen, u, method, body, replace] {
+            if (gen == gen_ && onNavigate) onNavigate(u, method, body, replace);
+        });
+    };
+    h.toast = [this](const std::string& t) {
+        if (onToast) onToast(t);
+    };
+    h.setUrl = [this](const std::string& u) {
+        url = u;
+        dirty_ = true;
+    };
+    h.scrollY = [this] { return scrollY; };
+    h.scrollTo = [this](float y) { SetScroll(y); };
+    h.over = [this] {
+        return doc_ ? std::const_pointer_cast<litehtml::element>(doc_->get_over_element()) : litehtml::element::ptr();
+    };
+    lastJsScroll_ = scrollY;
+    js_ = std::make_unique<JsEngine>(doc_, url, h);
+    js_->Start();
+    if (js_->TakeDirty()) Restyle();
+}
+
+void Page::Restyle() {
+    if (!doc_) return;
+    box_.missingCss.clear();
+    doc_->restyle();
+    Relayout();
+    lastRestyle_ = Ui::Time();
+    restyleDue_ = false;
+    if (!box_.missingCss.empty()) FetchMissingCss();
+}
+
+bool Page::JsEvent(const litehtml::element::ptr& el, const char* type) {
+    if (!js_ || !el) return false;
+    bool prevented = js_->Dispatch(el, type);
+    if (js_->TakeDirty()) restyleDue_ = true;
+    dirty_ = true;
+    return prevented;
+}
+
+bool Page::RunJs(const std::string& code) {
+    if (!js_) return false;
+    js_->RunUrl(code);
+    if (js_->TakeDirty()) restyleDue_ = true;
+    dirty_ = true;
+    return true;
+}
+
+std::vector<std::string> Page::JsConsole() const {
+    if (!js_) return {};
+    return std::vector<std::string>(js_->Console().begin(), js_->Console().end());
+}
+
 bool Page::Tick() {
+    if (js_) {
+        const bool scrolled = scrollY != lastJsScroll_;
+        lastJsScroll_ = scrollY;
+        if (js_->Tick(0, scrolled)) restyleDue_ = true;
+        // ponytail: one restyle per 50 ms at most, so a script animating every frame can't stall the console.
+        if (restyleDue_ && Ui::Time() - lastRestyle_ > 0.05) Restyle();
+    }
     if (doc_) {
         for (auto it = box_.waitingImages.begin(); it != box_.waitingImages.end();) {
             if (Images::Get(*it)) {  // ready or failed: either way its size is settled
@@ -251,6 +330,11 @@ void Page::Click(float x, float y, std::string& link, litehtml::element::ptr& co
     litehtml::position::vector boxes;
     const float dx = x - view_.x, dy = y - view_.y + scrollY;
     doc_->on_mouse_over(dx, dy, x - view_.x, y - view_.y, boxes);
+    if (js_) {
+        auto target = std::const_pointer_cast<litehtml::element>(doc_->get_over_element());
+        if (target && JsEvent(target, "click")) return;  // a handler took over the click
+        if (!doc_) return;
+    }
     doc_->on_lbutton_down(dx, dy, x - view_.x, y - view_.y, boxes);
     doc_->on_lbutton_up(dx, dy, x - view_.x, y - view_.y, boxes);
     link = box_.clickedLink;
@@ -281,7 +365,9 @@ bool Page::Locate(const std::string& selector, float& x, float& y) {
     return true;
 }
 
-bool Page::Busy() const { return loading || cssWaiting_ > 0 || !box_.waitingImages.empty(); }
+bool Page::Busy() const {
+    return loading || cssWaiting_ > 0 || !box_.waitingImages.empty() || (js_ && js_->Loading());
+}
 
 std::string Page::Probe(float x, float y) {
     if (!doc_) return "";

@@ -45,6 +45,24 @@ wait
 shot 11-sniffed-download
 press B
 
+# JavaScript: tests/js.html checks itself and lists PASS/FAIL rows
+open file://$PWD/tests/js.html
+wait
+sleep 400
+shot 13-js-page
+point #toggle
+press A
+sleep 200
+shot 14-js-onclick
+point #jslink
+press A
+sleep 100
+point input[name=q]
+type hello
+press A
+sleep 200
+shot 15-js-form-and-link
+
 # Typing into a search box submits its form
 open file://$PWD/tests/page.html
 wait

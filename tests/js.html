@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>BrowseNX JavaScript test</title>
+<style>
+  body { font-family: sans-serif; margin: 0; padding: 24px 40px; color: #222; }
+  h1 { margin: 0 0 12px 0; }
+  .row { margin: 8px 0; padding: 8px 12px; border: 1px solid #d0d7de; border-radius: 8px; }
+  .ok { background: #dafbe1; border-color: #3fb950; }
+  .bad { background: #ffebe9; border-color: #f85149; }
+  #panel { display: none; background: #ddf4ff; padding: 12px; border-radius: 8px; margin-top: 8px; }
+  #panel.open { display: block; }
+  button { font-size: 16px; }
+</style>
+<script src="js-ext.js"></script>
+<script>
+  // Runs before <body> exists: it must wait for DOMContentLoaded.
+  window.results = [];
+  function check(name, ok) { results.push([name, !!ok]); }
+  document.addEventListener('DOMContentLoaded', () => check('DOMContentLoaded fired', true));
+</script>
+</head>
+<body>
+<h1 id="title">JavaScript is OFF</h1>
+<noscript><p class="row bad">This line is only shown without JavaScript.</p></noscript>
+<div id="list"></div>
+<p><button id="toggle" onclick="document.getElementById('panel').classList.toggle('open')">Show panel</button>
+   <a id="jslink" href="javascript:document.getElementById('linkout').textContent = 'javascript: link ran'">Run a javascript: link</a>
+   <span id="linkout"></span></p>
+<div id="panel">The button's onclick toggled this panel with classList.</div>
+<form id="f" action="https://example.com/should-not-go-here">
+  <input name="q" placeholder="Type something">
+  <span id="formout"></span>
+</form>
+<p id="timer">Timer has not fired</p>
+<p id="fetched">fetch() pending</p>
+<script>
+  document.write('<p id="written" class="row">document.write wrote this</p>');
+</script>
+<script>
+  document.getElementById('title').textContent = 'JavaScript is ON';
+  check('external script ran first', window.fromExternal === 42);
+  check('querySelectorAll', document.querySelectorAll('p').length >= 3);
+  check('document.write', !!document.getElementById('written'));
+  check('ES2020+ syntax', (() => { const o = { a: { b: 1 } }; return o?.a?.b ?? 0; })() === 1);
+  check('JSON', JSON.parse('{"x":[1,2]}').x[1] === 2);
+  localStorage.setItem('k', 'v');
+  check('localStorage', localStorage.getItem('k') === 'v');
+  check('URL', new URL('../a?b=1#c', 'https://x.org/p/q').searchParams.get('b') === '1');
+  check('dataset', (() => { const d = document.createElement('div'); d.dataset.fooBar = 'z'; return d.getAttribute('data-foo-bar') === 'z'; })());
+  check('innerHTML round trip', (() => { const d = document.createElement('div'); d.innerHTML = '<b>hi</b>'; return d.firstElementChild.tagName === 'B'; })());
+
+  setTimeout(() => { document.getElementById('timer').textContent = 'setTimeout fired'; }, 50);
+  fetch('js-ext.js').then(r => r.text()).then(t => {
+    document.getElementById('fetched').textContent = 'fetch() got ' + t.length + ' bytes';
+  }, e => { document.getElementById('fetched').textContent = 'fetch() failed: ' + e; });
+  (async () => { await null; check('async/await', true); })();
+
+  document.getElementById('f').addEventListener('submit', e => {
+    e.preventDefault();
+    document.getElementById('formout').textContent = 'submit handler got: ' + e.target.q.value;
+  });
+
+  window.addEventListener('load', () => {
+    const list = document.getElementById('list');
+    for (const [name, ok] of results) {
+      const row = document.createElement('div');
+      row.className = 'row ' + (ok ? 'ok' : 'bad');
+      row.textContent = (ok ? 'PASS ' : 'FAIL ') + name;
+      list.appendChild(row);
+    }
+    console.log('test page:', results.filter(r => r[1]).length + '/' + results.length + ' passed');
+  });
+</script>
+</body>
+</html>

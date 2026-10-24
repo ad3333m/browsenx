@@ -57,6 +57,9 @@ static int RunScript(App& app, SDL_Surface* surface, const char* scriptPath, con
             do frame(0);
             while ((app.Busy() || SDL_GetTicks() - start < 300) && SDL_GetTicks() - start < 25000);
             for (int i = 0; i < 10; i++) frame(0);
+        } else if (cmd == "sleep") {
+            const uint32_t start = SDL_GetTicks();
+            while (SDL_GetTicks() - start < (uint32_t)atoi(arg.c_str())) frame(0);
         } else if (cmd == "waitdl") {
             const uint32_t start = SDL_GetTicks();
             do frame(0);

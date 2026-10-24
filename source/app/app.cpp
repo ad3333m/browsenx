@@ -72,6 +72,14 @@ void App::Init() {
         AskFileType(hit);
     };
     page.onCommit = [this] { redraw_ = 2; };
+    page.onToast = [this](const std::string& t) { ShowToast(t); };
+    page.onNavigate = [this](const std::string& u, const std::string& method, const std::string& body, bool replace) {
+        if (u == "nx:back") return GoBack();
+        if (u == "nx:forward") return GoForward();
+        const size_t before = back_.size();
+        Navigate(u, method, body);
+        if (replace && back_.size() > before) back_.pop_back();  // location.replace(): no history entry
+    };
     ShowHome();
     if (AppletMode())
         ShowToast("Opened from the album: memory is tight. Hold R while starting a game for full speed.", true);
@@ -137,7 +145,8 @@ void App::Navigate(const std::string& raw, const std::string& method, const std:
         return;
     }
     if (Str::StartsWith(url, "javascript:")) {
-        ShowToast("That link needs JavaScript. Try + > Open in Nintendo's browser.", true);
+        if (!page.RunJs(url.substr(11)))
+            ShowToast("JavaScript is off for this page. Turn it on from the + menu.", true);
         return;
     }
     if (Str::StartsWith(url, "mailto:") || Str::StartsWith(url, "tel:")) {
@@ -245,11 +254,15 @@ void App::HandleControl(const litehtml::element::ptr& el) {
             if (i < 0) return;
             Forms::Select(el, i);
             page.Relayout();
+            page.JsEvent(el, "input");
+            page.JsEvent(el, "change");
         };
         menu_ = std::move(m);
     } else if (type == "checkbox" || type == "radio") {
         Forms::Toggle(el);
         page.Relayout();
+        page.JsEvent(el, "input");
+        page.JsEvent(el, "change");
     } else if (Forms::IsTextField(el)) {
         std::string guide = el->get_attr("placeholder", "");
         if (guide.empty()) guide = el->get_attr("aria-label", "");
@@ -260,25 +273,25 @@ void App::HandleControl(const litehtml::element::ptr& el) {
             return;
         Forms::SetValue(el, out);
         page.Relayout();
+        page.JsEvent(el, "input");
+        page.JsEvent(el, "change");
         // Like pressing Enter: a form with a single text box (a search) sends at once.
         auto form = Forms::FormOf(el);
-        if (tag == "input" && form && Forms::TextFieldCount(form) == 1) {
-            auto s = Forms::Build(form, nullptr, page.url);
-            Navigate(s.url, s.method, s.body);
-        }
+        if (tag == "input" && form && Forms::TextFieldCount(form) == 1) SubmitForm(form, nullptr);
     } else if (Forms::IsSubmit(el)) {
-        auto form = Forms::FormOf(el);
-        if (!form) {
-            ShowToast("That button needs JavaScript. Try + > Open in Nintendo's browser.", true);
-            return;
-        }
-        auto s = Forms::Build(form, el, page.url);
-        Navigate(s.url, s.method, s.body);
+        if (auto form = Forms::FormOf(el)) SubmitForm(form, el);
+        else if (!page.JsRunning()) ShowToast("That button needs JavaScript. Turn it on from the + menu.", true);
     } else if (type == "file") {
         ShowToast("Uploading files isn't supported.", true);
-    } else {
-        ShowToast("That button needs JavaScript. Try + > Open in Nintendo's browser.", true);
+    } else if (!page.JsRunning()) {
+        ShowToast("That button needs JavaScript. Turn it on from the + menu.", true);
     }
+}
+
+void App::SubmitForm(const litehtml::element::ptr& form, const litehtml::element::ptr& submitter) {
+    if (page.JsEvent(form, "submit")) return;  // the page's script handles it (search-as-you-type, AJAX forms)
+    auto s = Forms::Build(form, submitter, page.url);
+    Navigate(s.url, s.method, s.body);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,6 +411,17 @@ void App::ShowToast(const std::string& text, bool error) {
     if (toasts_.size() > 3) toasts_.erase(toasts_.begin());
 }
 
+void App::ShowConsole() {
+    auto m = std::make_unique<ListMenu>();
+    m->title = "JavaScript console";
+    m->subtitle = page.url;
+    auto lines = page.JsConsole();
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it) m->items.push_back({Str::OneLine(*it), ""});
+    if (m->items.empty()) m->items.push_back({"Nothing logged yet.", ""});
+    m->onPick = [](int) {};
+    menu_ = std::move(m);
+}
+
 void App::OpenMainMenu() {
     auto m = std::make_unique<ListMenu>();
     m->title = "BrowseNX";
@@ -430,6 +454,13 @@ void App::OpenMainMenu() {
     }
     add("Downloads", Downloads::AnyRunning() ? "In progress" : "", [this] { Navigate("about:downloads"); });
     add("Reload", "", [this] { Reload(); });
+    add(page.jsEnabled ? "Turn JavaScript off" : "Turn JavaScript on",
+        page.jsEnabled ? "Simpler, faster pages" : "Menus, buttons and search boxes that need scripts", [this] {
+            page.jsEnabled = !page.jsEnabled;
+            ShowToast(page.jsEnabled ? "JavaScript is on." : "JavaScript is off.");
+            Reload();
+        });
+    if (page.JsRunning()) add("JavaScript console", "Messages and errors from this page", [this] { ShowConsole(); });
     add("Quit BrowseNX", Downloads::AnyRunning() ? "Stops the downloads in progress" : "", [this] { quit = true; });
     m->onPick = [acts](int i) {
         if (i >= 0 && i < (int)acts.size()) acts[i]();

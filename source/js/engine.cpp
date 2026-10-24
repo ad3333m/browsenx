@@ -708,7 +708,7 @@ void JsEngine::Fetch(int requestId, const std::string& method, const std::string
         Async::Post([this, alive, r, requestId] {
             auto a = alive.lock();
             if (!a || !*a) return;
-            JSValue args[6] = {JS_NewInt32(ctx_, requestId), JS_NewInt32(ctx_, (int)r->status), Str(ctx_, r->body),
+            JSValue args[6] = {JS_NewInt32(ctx_, requestId), JS_NewInt32(ctx_, r->status == 0 && r->Ok() ? 200 : (int)r->status), Str(ctx_, r->body),
                                Str(ctx_, r->headers), Str(ctx_, r->finalUrl), Str(ctx_, r->error)};
             JSValue global = JS_GetGlobalObject(ctx_);
             JSValue fn = JS_GetPropertyStr(ctx_, global, "__nxFetchDone");

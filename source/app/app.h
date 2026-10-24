@@ -72,6 +72,8 @@ private:
     void ShowDownloads(float scroll = 0);
     void Click(float x, float y);
     void HandleControl(const litehtml::element::ptr& el);
+    void SubmitForm(const litehtml::element::ptr& form, const litehtml::element::ptr& submitter);
+    void ShowConsole();
     void HandleNx(const std::string& link);
     void ShowToast(const std::string& text, bool error = false);
     void LoadBookmarks();

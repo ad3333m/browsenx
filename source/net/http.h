@@ -29,7 +29,8 @@ struct Response {
     uint64_t contentLength = 0;
     std::string headers;       // every header line of the final response, for fetch()
     bool isFile = false;       // stopOnFile tripped: body is empty, nothing was read
-    bool Ok() const { return status >= 200 && status < 300; }
+    // file:// transfers report no status at all; no error means they worked.
+    bool Ok() const { return (status >= 200 && status < 300) || (status == 0 && error.empty()); }
 };
 
 void GlobalInit();

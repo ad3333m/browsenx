@@ -599,6 +599,22 @@ class HTMLButtonElement extends HTMLElement {
 reflect(HTMLButtonElement, ['name']);
 reflectBool(HTMLButtonElement, ['disabled']);
 class HTMLFormElement extends HTMLElement {
+  constructor(id) {
+    super(id);
+    // form.q / form['email']: named controls read as properties, like in real browsers.
+    const proxy = new Proxy(this, {
+      get(t, k) {
+        if (typeof k === 'string' && !(k in t)) {
+          const hit = t.querySelector('[name="' + k.replace(/"/g, '\\"') + '"], [id="' + k.replace(/"/g, '\\"') + '"]');
+          if (hit) return hit;
+        }
+        return Reflect.get(t, k, t);
+      },
+      set(t, k, v) { t[k] = v; return true; },
+    });
+    nodes.set(this._id, proxy);
+    return proxy;
+  }
   get elements() { return this.querySelectorAll('input, select, textarea, button'); }
   get length() { return this.elements.length; }
   submit() { nx.submit(this._id, 0); }
@@ -1365,7 +1381,7 @@ G.__nxDispatch = (id, type) => {
   return !el.dispatchEvent(ev);
 };
 G.__nxTick = (t, scrolled) => {
-  now = t;
+  now = nx.now();
   for (const [id, tm] of Array.from(timerList)) {
     if (tm.at > now || !timerList.has(id)) continue;
     if (tm.every) tm.at = now + tm.every; else timerList.delete(id);

@@ -21,19 +21,26 @@ add_library(litehtml STATIC ${LITEHTML_SOURCES} ${GUMBO_SOURCES})
 target_include_directories(litehtml PUBLIC ${LH}/include ${LH}/include/litehtml ${LH}/src ${LH}/src/gumbo/include
                            ${LH}/src/gumbo/include/gumbo)
 
+# QuickJS asserts on leaked values when a runtime is freed; leave that to the debug tools.
+add_library(quickjs STATIC third_party/quickjs/quickjs-amalgam.c)
+target_include_directories(quickjs PUBLIC third_party/quickjs)
+target_compile_definitions(quickjs PRIVATE NDEBUG)
+target_link_libraries(quickjs PUBLIC m Threads::Threads)
+
 file(GLOB CORE_SOURCES
   source/util/*.cpp
   source/net/*.cpp
   source/ui/*.cpp
   source/ui/*.c
   source/web/*.cpp
+  source/js/*.cpp
   source/app/*.cpp)
 
 add_executable(browsenx source/main.cpp ${CORE_SOURCES} source/platform/desktop/platform_desktop.cpp)
 target_include_directories(browsenx PRIVATE source third_party ${DEPS_INCLUDE_DIRS})
 target_compile_options(browsenx PRIVATE ${DEPS_CFLAGS_OTHER} -Wall -Wno-unused-function)
 target_link_directories(browsenx PRIVATE ${DEPS_LIBRARY_DIRS})
-target_link_libraries(browsenx PRIVATE litehtml ${DEPS_LIBRARIES} Threads::Threads)
+target_link_libraries(browsenx PRIVATE litehtml quickjs ${DEPS_LIBRARIES} Threads::Threads)
 
 add_executable(test_urlutil tests/test_urlutil.cpp source/web/urlutil.cpp)
 target_include_directories(test_urlutil PRIVATE source)

@@ -12,10 +12,10 @@ include $(DEVKITPRO)/libnx/switch_rules
 
 TARGET      := BrowseNX
 BUILD       := build
-SOURCES     := source source/util source/net source/ui source/web source/app source/platform/switch \
-               third_party/litehtml/src third_party/litehtml/src/gumbo
+SOURCES     := source source/util source/net source/ui source/web source/app source/js source/platform/switch \
+               third_party/litehtml/src third_party/litehtml/src/gumbo third_party/quickjs
 DATA        := data
-INCLUDES    := source third_party third_party/litehtml/include third_party/litehtml/include/litehtml \
+INCLUDES    := source third_party third_party/quickjs third_party/litehtml/include third_party/litehtml/include/litehtml \
                third_party/litehtml/src third_party/litehtml/src/gumbo/include third_party/litehtml/src/gumbo/include/gumbo
 ROMFS       := romfs
 APP_TITLE   := BrowseNX
@@ -29,7 +29,7 @@ PKGCONF := $(DEVKITPRO)/portlibs/switch/bin/aarch64-none-elf-pkg-config
 PKGS    := sdl2 freetype2 libcurl libwebp
 
 ARCH     := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
-CFLAGS   := -g -Wall -O2 -ffunction-sections $(ARCH) $(DEFINES) $(INCLUDE) -D__SWITCH__ \
+CFLAGS   := -g -Wall -O2 -ffunction-sections $(ARCH) $(DEFINES) $(INCLUDE) -D__SWITCH__ -DNDEBUG \
             $(shell $(PKGCONF) --cflags $(PKGS))
 CXXFLAGS := $(CFLAGS) -std=gnu++20 -fexceptions
 CFLAGS   += -std=gnu11

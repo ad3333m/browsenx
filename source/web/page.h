@@ -3,10 +3,13 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <set>
+#include <vector>
 #include <string>
 
 #include <litehtml.h>
 
+#include "js/engine.h"
 #include "ui/gfx.h"
 #include "web/container.h"
 
@@ -26,6 +29,11 @@ public:
     float height = 0;   // laid-out document height
     std::function<void(const FileHit&)> onFile;
     std::function<void()> onCommit;  // a new document replaced the old one
+    // Navigation a script asked for (location.href, form.submit(), history.back() as "nx:back" ...).
+    std::function<void(const std::string& url, const std::string& method, const std::string& body, bool replace)>
+        onNavigate;
+    std::function<void(const std::string& text)> onToast;  // alert()
+    bool jsEnabled = true;
 
     // Starts loading. The current document stays up until the new one arrives.
     void Load(const std::string& url, const std::string& method = "GET", const std::string& body = "",
@@ -54,6 +62,11 @@ public:
     // Screen centre of the first element matching a CSS selector (used by the CI script).
     bool Locate(const std::string& selector, float& x, float& y);
     bool Busy() const;
+    // JavaScript: events from the user (true = a handler called preventDefault), javascript: URLs, console.
+    bool JsEvent(const litehtml::element::ptr& el, const char* type);
+    bool RunJs(const std::string& code);
+    bool JsRunning() const { return js_ != nullptr; }
+    std::vector<std::string> JsConsole() const;
     // Debug (CI script): the element chain under a screen point, e.g. "div#content.mw-body [0,1520 960x4000]".
     std::string Probe(float x, float y);
     // Debug (CI script): elements down to `depth` levels with their laid-out boxes, one per line.
@@ -62,6 +75,11 @@ public:
 private:
     WebContainer box_;  // before doc_: the document hands its fonts back to it when destroyed
     std::shared_ptr<litehtml::document> doc_;
+    std::unique_ptr<JsEngine> js_;  // after doc_: it goes first, while the elements it holds are still valid
+    std::set<std::string> cssInFlight_;
+    double lastRestyle_ = 0;
+    bool restyleDue_ = false;
+    float lastJsScroll_ = 0;
     Rect view_{0, 56, 1280, 636};
     std::string html_, charset_, fragment_;
     int gen_ = 0;       // bumps on every navigation; late results from old ones are dropped
@@ -77,4 +95,6 @@ private:
     void Build(bool first);
     void FetchMissingCss();
     void ScrollToFragment();
+    void StartJs();
+    void Restyle();
 };

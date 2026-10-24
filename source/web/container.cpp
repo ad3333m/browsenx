@@ -28,6 +28,7 @@ input[type="submit"], input[type="button"], input[type="reset"], input[type="ima
 input[type="checkbox"], input[type="radio"] { padding: 0; margin: 3px 4px; }
 input[type="radio"] { border-radius: 50%; }
 main, figure, figcaption, details, summary, dialog, search { display: block; }
+script, template { display: none; }
 )css";
 
 namespace {
@@ -682,6 +683,8 @@ void WebContainer::get_viewport(position& v) const { v = position(0, 0, viewW, v
 element::ptr WebContainer::create_element(const char* tag, const string_map&, const std::shared_ptr<document>& doc) {
     if (!strcmp(tag, "input") || !strcmp(tag, "textarea") || !strcmp(tag, "select"))
         return std::make_shared<ElControl>(doc);
+    // litehtml's own <script> element drops its attributes (src, type); a plain tag keeps them for JsEngine.
+    if (!strcmp(tag, "script")) return std::make_shared<html_tag>(doc);
     return nullptr;
 }
 
